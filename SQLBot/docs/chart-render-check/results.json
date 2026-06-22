@@ -1,0 +1,51 @@
+[
+  {
+    "type": "table",
+    "name": "明细表",
+    "status": "pass",
+    "note": "前端 Table 使用 @antv/s2，源码链路和构建已通过；生成展示 PNG 29102 bytes",
+    "file": "table.png"
+  },
+  {
+    "type": "column",
+    "name": "柱状图",
+    "status": "pass",
+    "note": "生成 PNG 31579 bytes",
+    "file": "column.png"
+  },
+  {
+    "type": "bar",
+    "name": "条形图",
+    "status": "pass",
+    "note": "生成 PNG 32047 bytes",
+    "file": "bar.png"
+  },
+  {
+    "type": "line",
+    "name": "折线图",
+    "status": "pass",
+    "note": "生成 PNG 61740 bytes",
+    "file": "line.png"
+  },
+  {
+    "type": "pie",
+    "name": "饼图",
+    "status": "pass",
+    "note": "生成 PNG 49169 bytes",
+    "file": "pie.png"
+  },
+  {
+    "type": "scatter",
+    "name": "散点图",
+    "status": "pass",
+    "note": "生成 PNG 41193 bytes",
+    "file": "scatter.png"
+  },
+  {
+    "type": "area",
+    "name": "面积图",
+    "status": "pass",
+    "note": "生成 PNG 44078 bytes",
+    "file": "area.png"
+  }
+]

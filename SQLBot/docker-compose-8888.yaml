@@ -1,0 +1,42 @@
+name: sqlbot8888
+
+services:
+  sqlbot-8888:
+    build:
+      context: .
+      dockerfile: Dockerfile-8888
+    image: sqlbot-local:8888
+    container_name: sqlbot-8888
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8888:8000"
+    environment:
+      SQLBOT_DB_HOST: localhost
+      SQLBOT_DB_PORT: 5432
+      SQLBOT_DB_DB: sqlbot
+      SQLBOT_DB_USER: root
+      SQLBOT_DB_PASSWORD: "Password123@pg"
+      PROJECT_NAME: "小爱同学"
+      SECRET_KEY: "y5txe1mRmS_JpOrUzFzHEu-kIQn3lf7ll0AOv9DQh0s"
+      DEFAULT_PWD: "SQLBot@123456"
+      SQLBOT_DEFAULT_PWD: "SQLBot@123456"
+      SQLBOT_SECRET_KEY: "y5txe1mRmS_JpOrUzFzHEu-kIQn3lf7ll0AOv9DQh0s"
+      SQLBOT_SERVER_IMAGE_HOST: "http://183.36.30.83:8888/images/"
+      BACKEND_CORS_ORIGINS: "http://localhost,http://localhost:5173,https://localhost,https://localhost:5173,http://183.36.30.83:8888"
+      SQLBOT_CORS_ORIGINS: "http://localhost,http://localhost:5173,https://localhost,https://localhost:5173,http://183.36.30.83:8888"
+      SQLBOT_LOG_LEVEL: "INFO"
+      SQLBOT_CACHE_TYPE: "memory"
+      SQLBOT_EXTERNAL_DB: "false"
+      POSTGRES_DB: sqlbot
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: "Password123@pg"
+    volumes:
+      - ./data-8888/sqlbot/excel:/opt/sqlbot/data/excel
+      - ./data-8888/sqlbot/file:/opt/sqlbot/data/file
+      - ./data-8888/sqlbot/images:/opt/sqlbot/images
+      - ./data-8888/sqlbot/logs:/opt/sqlbot/app/logs
+      - sqlbot-8888-postgresql:/var/lib/postgresql/data
+
+volumes:
+  sqlbot-8888-postgresql:
