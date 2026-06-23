@@ -30,6 +30,36 @@ UNIT_COUNT_KEYWORDS = (
 UNIT_WEIGHT_KEYWORDS = ("weight", "kg", "克", "吨", "重量")
 UNIT_PERCENT_KEYWORDS = ("rate", "ratio", "percent", "率", "占比", "百分比")
 
+ALIAS_TOKEN_MAP = {
+    "demand": "需求", "available": "可用", "supply": "供应", "gap": "缺口",
+    "total": "总量", "amount": "金额", "qty": "数量", "quantity": "数量",
+    "rate": "率", "percent": "百分比", "ratio": "占比", "price": "价格",
+    "cost": "成本", "revenue": "收入", "profit": "利润", "count": "次数",
+    "material": "物料", "code": "编码", "name": "名称", "desc": "描述",
+    "product": "产品", "warehouse": "仓库", "region": "区域", "date": "日期",
+    "month": "月份", "year": "年份", "forecast": "预测", "actual": "实际",
+    "plan": "计划", "order": "订单", "stock": "库存", "safety": "安全",
+}
+
+
+def _infer_alias(name: str) -> str:
+    """Translate snake_case field names to Chinese via a token map; keep unknowns."""
+    if not name:
+        return name
+    # Already (mostly) Chinese — return as-is.
+    if any("一" <= ch <= "鿿" for ch in name):
+        return name
+    tokens = []
+    for raw in str(name).replace("-", "_").split("_"):
+        if not raw:
+            continue
+        lowered = raw.lower()
+        tokens.append(ALIAS_TOKEN_MAP.get(lowered, raw))
+    joined = "".join(tokens)
+    if all("一" <= ch <= "鿿" for ch in joined if ch):
+        return joined
+    return " ".join(tokens)
+
 
 def _infer_unit(name: str, numeric_values: list[Decimal]) -> str | None:
     """Infer a unit LABEL from the field name and value range. Never converts."""
@@ -199,6 +229,7 @@ def _field_profile(name: str, values: list[Any], row_count: int) -> dict[str, An
 
     profile: dict[str, Any] = {
         "name": name,
+        "alias": _infer_alias(name),
         "type": inferred_type,
         "role": role,
         "non_empty_count": len(non_empty),

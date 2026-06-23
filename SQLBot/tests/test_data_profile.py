@@ -123,3 +123,24 @@ def test_unit_none_when_no_signal():
         ["mystery"], [{"mystery": 42}, {"mystery": 7}],
     )
     assert profile["fields"][0].get("unit") is None
+
+
+def test_alias_translates_known_snake_case_tokens():
+    profile = build_data_profile(
+        ["demand_total", "available_total", "supply_gap", "gap_rate_percent"],
+        [{"demand_total": 1, "available_total": 1, "supply_gap": 1, "gap_rate_percent": 1}],
+    )
+    by_name = {f["name"]: f for f in profile["fields"]}
+    assert by_name["demand_total"]["alias"] == "需求总量"
+    assert by_name["supply_gap"]["alias"] == "供应缺口"
+    assert by_name["gap_rate_percent"]["alias"] == "缺口率百分比"
+
+
+def test_alias_keeps_unknown_tokens_and_skips_already_chinese():
+    profile = build_data_profile(
+        ["weird_xyz", "物料编码"], [{"weird_xyz": 1, "物料编码": "M1"}],
+    )
+    by_name = {f["name"]: f for f in profile["fields"]}
+    assert by_name["weird_xyz"]["alias"] == "weird xyz"
+    # Already-Chinese names alias to themselves
+    assert by_name["物料编码"]["alias"] == "物料编码"
