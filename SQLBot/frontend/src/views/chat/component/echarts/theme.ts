@@ -1,4 +1,4 @@
-import { formatNumber } from './data'
+import { formatNumber } from './data.ts'
 
 /** 与原 G2 版本一致的 SQLBOT 配色。 */
 export const SQLBOT_PALETTE = [
