@@ -144,13 +144,29 @@ onMounted(() => {
       line-height: 22px;
       font-weight: 400;
       font-size: 14px;
-      color: rgba(143, 149, 158, 1) !important;
+      color: rgba(143, 149, 158, 1);
 
       .markdown-body {
-        color: rgba(143, 149, 158, 1) !important;
+        color: rgba(143, 149, 158, 1);
         line-height: 22px;
         font-weight: 400;
         font-size: 14px;
+
+        // Keep the whole thinking block muted — text and headings — without the
+        // blanket !important that used to also wipe out code-highlight colors.
+        p,
+        li,
+        ul,
+        ol,
+        blockquote,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+          color: rgba(143, 149, 158, 1);
+        }
       }
 
       padding-bottom: 8px;

@@ -14,6 +14,7 @@ import ChartBlock from '@/views/chat/chat-block/ChartBlock.vue'
 import JSONBig from 'json-bigint'
 import ExecutionProcess from '@/views/chat/ExecutionProcess.vue'
 import { i18n } from '@/i18n'
+import { extractSSEFrames } from '@/utils/sse'
 
 const { t } = i18n.global
 
@@ -182,10 +183,11 @@ const sendMessage = async () => {
 
       let chunk = decoder.decode(value, { stream: true })
       tempResult += chunk
-      const split = tempResult.match(/data:.*}\n\n/g)
+      const parsed = extractSSEFrames(tempResult)
+      tempResult = parsed.remainder
+      const split = parsed.frames.length ? parsed.frames.map((f) => 'data:' + f + '\n\n') : null
       if (split) {
         chunk = split.join('')
-        tempResult = tempResult.replace(chunk, '')
       } else {
         continue
       }

@@ -132,6 +132,21 @@ class Settings(BaseSettings):
     TABLE_EMBEDDING_COUNT: int = 10
     DS_EMBEDDING_COUNT: int = 10
 
+    # --- Phase 2: 新底层开关与检索配置（默认关闭，接线后可逐步开启）---------
+    # 总开关：启用 LangGraph agent 路径（generate→execute→repair）替换过程式 SQL 阶段。
+    AGENT_SQL_ENABLED: bool = False
+    AGENT_SQL_MAX_ATTEMPTS: int = 2
+    # RAG 检索层（apps.datasource.retrieval）参数
+    RETRIEVAL_MIN_SIMILARITY: float = 0.3
+    RETRIEVAL_TOP_K: int = 10
+    RETRIEVAL_SPHERE_RADIUS: int = 1
+    RETRIEVAL_MAX_BRIDGE_HOPS: int = 6
+    RETRIEVAL_SCHEMA_TOKEN_BUDGET: int = 4000
+    RETRIEVAL_EXAMPLES_TOKEN_BUDGET: int = 1500
+    RETRIEVAL_DOCS_TOKEN_BUDGET: int = 1000
+    RETRIEVAL_SAMPLES_TOKEN_BUDGET: int = 1000
+    RETRIEVAL_TOTAL_TOKEN_BUDGET: int = 8000
+
     ORACLE_CLIENT_PATH: str = '/opt/sqlbot/db_client/oracle_instant_client'
 
     @field_validator('SQL_DEBUG',
@@ -141,6 +156,7 @@ class Settings(BaseSettings):
                      'PG_POOL_PRE_PING',
                      'TABLE_EMBEDDING_ENABLED',
                      'QUERY_CACHE_ENABLED',
+                     'AGENT_SQL_ENABLED',
                      mode='before')
     @classmethod
     def lowercase_bool(cls, v: Any) -> Any:

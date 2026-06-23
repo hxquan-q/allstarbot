@@ -189,7 +189,6 @@ function formatMetricValue(value: any): string {
 const currentChartType = ref<ChartTypes | undefined>(
   (props.chatType ?? baseChartObject.value.type ?? 'table') as ChartTypes
 )
-const selectedAlternativeIndex = ref<number | undefined>(undefined)
 const selectedChartConfig = ref<ChartConfig | undefined>(props.initialChartConfig)
 
 function tableColumnsFromData(): Array<ChartAxisItem> {
@@ -232,13 +231,31 @@ const chartSummary = computed(() => {
   return typeof s === 'string' ? s.trim() : ''
 })
 
-const chartSummaryHtml = computed(() => {
-  if (!chartSummary.value) return ''
+// 轻度折叠：长报告默认只展示"总论 + 首个分层段"，避免文字分析把整条回答拉得过长；
+// 用户点击"展开全文"查看完整分层/行动建议。切到新回答时自动回到折叠态。
+const SUMMARY_KEEP_SECTIONS = 2
+const summaryExpanded = ref(false)
+const summarySections = computed(() => {
+  const text = chartSummary.value
+  if (!text) return []
+  // 按行首 "## " 二级标题切分（不含 ### 三级），保留分隔符
+  return text.split(/(?=^## )/m).filter((part) => part.trim().length > 0)
+})
+const summaryIsLong = computed(() => summarySections.value.length > SUMMARY_KEEP_SECTIONS)
+const displaySummary = computed(() => {
+  if (!summaryIsLong.value || summaryExpanded.value) return chartSummary.value
+  return summarySections.value.slice(0, SUMMARY_KEEP_SECTIONS).join('').trim()
+})
+const displaySummaryHtml = computed(() => {
+  if (!displaySummary.value) return ''
   try {
-    return md.render(chartSummary.value)
+    return md.render(displaySummary.value)
   } catch (e) {
-    return chartSummary.value
+    return displaySummary.value
   }
+})
+watch(chartSummary, () => {
+  summaryExpanded.value = false
 })
 
 const chartAlternatives = computed(() => {
@@ -246,6 +263,24 @@ const chartAlternatives = computed(() => {
     ? currentChartObject.value.alternatives.filter((item) => item?.type)
     : []
 })
+
+function completeFlatChartConfig(config: ChartConfig): ChartConfig {
+  const completed = normalizeChartConfig(config, data.value, dataObject.value?.fields)
+  if (completed.type === 'table' && (!completed.columns || completed.columns.length === 0)) {
+    completed.columns = tableColumnsFromData()
+  }
+  return completed
+}
+
+const flatAlternativeCharts = computed(() =>
+  chartAlternatives.value
+    .map((item, idx) => ({
+      index: idx,
+      config: completeFlatChartConfig(item),
+      raw: item,
+    }))
+    .filter((item) => canRenderChartConfig(item.config))
+)
 
 const chartType = computed<ChartTypes>({
   get() {
@@ -315,7 +350,6 @@ function changeTable() {
 }
 
 function onTypeChange(val: any) {
-  selectedAlternativeIndex.value = undefined
   chartType.value = val
   selectedChartConfig.value = completeChartConfig()
   chartRef.value?.onTypeChange()
@@ -325,23 +359,25 @@ function reloadChart() {
   chartRef.value?.onTypeChange()
 }
 
-function hasRenderableConfig(config: ChartConfig) {
-  const completed = completeChartConfig(config)
-  return canRenderChartConfig(completed)
-}
-
-function selectAlternative(item: ChartConfig, idx: number) {
-  if (!hasRenderableConfig(item)) {
-    return
-  }
-  selectedAlternativeIndex.value = idx
-  selectedChartConfig.value = completeChartConfig(item)
-  chartType.value = (selectedChartConfig.value.type ?? 'table') as ChartTypes
-  chartRef.value?.onTypeChange()
-}
-
 function chartTypeName(type?: ChartTypes | string) {
   return type ? t(`chat.chart_type.${type}`) : t('chat.type')
+}
+
+function chartConfigType(config?: ChartConfig): ChartTypes {
+  return (config?.type || 'table') as ChartTypes
+}
+
+function renderMarkdownText(value?: string) {
+  if (!value) return ''
+  try {
+    return md.render(value)
+  } catch (e) {
+    return value
+  }
+}
+
+function alternativeInsights(config: ChartConfig) {
+  return Array.isArray(config.insights) ? config.insights : []
 }
 
 const dialogVisible = ref(false)
@@ -510,7 +546,6 @@ watch(
   () => props.message?.record?.chart,
   (val) => {
       if (val) {
-      selectedAlternativeIndex.value = undefined
       selectedChartConfig.value = props.initialChartConfig
       currentChartType.value = (props.chatType ?? baseChartObject.value.type ?? 'table') as ChartTypes
     }
@@ -685,8 +720,14 @@ watch(
       <div
         v-if="chartSummary"
         class="chart-summary-panel markdown-body"
-        v-dompurify-html="chartSummaryHtml"
+        v-dompurify-html="displaySummaryHtml"
       ></div>
+      <div v-if="chartSummary && summaryIsLong" class="summary-toggle-row">
+        <span class="summary-toggle-btn" @click="summaryExpanded = !summaryExpanded">
+          {{ summaryExpanded ? t('chat.collapse') || '收起' : t('chat.expand') || '展开全文' }}
+          <span class="toggle-arrow" :class="{ expanded: summaryExpanded }">▾</span>
+        </span>
+      </div>
       <div class="chart-block">
         <DisplayChartBlock
           :id="chartId"
@@ -747,7 +788,7 @@ watch(
           </div>
         </div>
       </div>
-      <div v-if="chartInsights.length || chartAlternatives.length" class="chart-analysis-panel">
+      <div v-if="chartInsights.length" class="chart-analysis-panel">
         <div v-if="chartInsights.length" class="analysis-section">
           <div class="analysis-title">{{ t('chat.chart_insights') }}</div>
           <ul class="analysis-list">
@@ -756,25 +797,49 @@ watch(
             </li>
           </ul>
         </div>
-        <div v-if="chartAlternatives.length" class="analysis-section">
-          <div class="analysis-title">{{ t('chat.chart_alternatives') }}</div>
-          <div class="alternative-list">
-            <button
-              v-for="(item, idx) in chartAlternatives"
-              :key="'alternative-' + idx"
-              class="alternative-item"
-              :class="{
-                active: selectedAlternativeIndex === idx,
-                disabled: !hasRenderableConfig(item),
-              }"
-              type="button"
-              @click="selectAlternative(item, idx)"
-            >
-              <span class="alternative-type">{{ chartTypeName(item.type) }}</span>
-              <span class="alternative-title">{{ item.title }}</span>
-              <span v-if="item.reason" class="alternative-reason">{{ item.reason }}</span>
-            </button>
-          </div>
+      </div>
+      <div v-if="flatAlternativeCharts.length" class="flat-alternatives-panel">
+        <div class="analysis-title">{{ t('chat.chart_alternatives') }}</div>
+        <div class="flat-alternative-list">
+          <section
+            v-for="item in flatAlternativeCharts"
+            :key="'flat-alternative-' + item.index"
+            class="flat-alternative-card"
+          >
+            <div class="flat-alternative-header">
+              <span class="alternative-type">{{ chartTypeName(item.config.type) }}</span>
+              <span class="flat-alternative-title">
+                {{ item.config.title || item.raw.title || `${t('chat.chart_alternatives')} ${item.index + 1}` }}
+              </span>
+            </div>
+            <div v-if="item.config.reason || item.raw.reason" class="flat-alternative-reason">
+              {{ item.config.reason || item.raw.reason }}
+            </div>
+            <div
+              v-if="item.config.summary"
+              class="flat-alternative-summary markdown-body"
+              v-dompurify-html="renderMarkdownText(item.config.summary)"
+            ></div>
+            <div class="flat-alternative-chart">
+              <DisplayChartBlock
+                :id="`${chartId}-alternative-${item.index}`"
+                :chart-type="chartConfigType(item.config)"
+                :message="message"
+                :chart-config="item.config"
+                :data="data"
+                :loading-data="loadingData"
+                :show-label="showLabel"
+              />
+            </div>
+            <ul v-if="alternativeInsights(item.config).length" class="analysis-list compact">
+              <li
+                v-for="(insight, insightIdx) in alternativeInsights(item.config)"
+                :key="'alternative-insight-' + item.index + '-' + insightIdx"
+              >
+                {{ insight }}
+              </li>
+            </ul>
+          </section>
         </div>
       </div>
     </template>
@@ -913,7 +978,7 @@ watch(
 <style scoped lang="less">
 .chart-component-container {
   width: 100%;
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(222, 224, 227, 1);
@@ -924,6 +989,7 @@ watch(
     border-radius: unset;
     padding: 0;
     height: 100%;
+    overflow-y: auto;
 
     .header-bar {
       border-bottom: 1px solid rgba(31, 35, 41, 0.15);
@@ -932,9 +998,23 @@ watch(
     }
 
     .chart-block {
-      margin: unset;
-      padding: 16px;
-      height: calc(100% - 56px);
+      flex: none;
+      margin: 20px;
+      padding: 0;
+      height: min(560px, calc(100vh - 180px));
+      min-height: 360px;
+    }
+
+    .chart-summary-panel,
+    .over-limit-hint,
+    .dimension-analysis-panel,
+    .chart-analysis-panel,
+    .flat-alternatives-panel {
+      margin: 20px 20px 0;
+    }
+
+    .key-metrics-panel {
+      margin: 20px 20px 0;
     }
   }
 
@@ -1059,11 +1139,11 @@ watch(
     height: 352px;
     width: 100%;
 
-    margin-top: 16px;
+    margin-top: 20px;
   }
 
   .chart-summary-panel {
-    margin-top: 12px;
+    margin-top: 16px;
     padding: 16px 18px;
     border-radius: 8px;
     border-left: 3px solid var(--ed-color-primary, rgba(28, 186, 144, 1));
@@ -1144,6 +1224,39 @@ watch(
       margin: 10px 0;
     }
   }
+  .summary-toggle-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 4px;
+  }
+
+  .summary-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--ed-color-primary, rgba(28, 186, 144, 1));
+    cursor: pointer;
+    user-select: none;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: rgba(28, 186, 144, 0.08);
+    }
+
+    .toggle-arrow {
+      display: inline-block;
+      transition: transform 0.18s ease;
+
+      &.expanded {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
   .over-limit-hint {
     min-height: 24px;
     line-height: 24px;
@@ -1154,7 +1267,7 @@ watch(
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-top: 12px;
+    margin-top: 20px;
     padding: 0 4px;
 
     .metric-card {
@@ -1196,7 +1309,7 @@ watch(
   }
 
   .dimension-analysis-panel {
-    margin-top: 12px;
+    margin-top: 20px;
     padding: 12px;
     border: 1px solid rgba(222, 224, 227, 1);
     border-radius: 8px;
@@ -1292,7 +1405,7 @@ watch(
   }
 
   .chart-analysis-panel {
-    margin-top: 12px;
+    margin-top: 20px;
     padding: 12px;
     border: 1px solid rgba(222, 224, 227, 1);
     border-radius: 8px;
@@ -1317,46 +1430,32 @@ watch(
       font-size: 13px;
       line-height: 20px;
     }
+  }
 
-    .alternative-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+  .flat-alternatives-panel {
+    margin-top: 20px;
+    padding: 12px;
+    border: 1px solid rgba(222, 224, 227, 1);
+    border-radius: 8px;
+    background: rgba(247, 248, 250, 1);
+
+    > .analysis-title {
+      margin-bottom: 10px;
+      color: rgba(31, 35, 41, 1);
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 20px;
     }
 
-    .alternative-item {
-      width: 100%;
-      padding: 6px 8px;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      background: transparent;
+    .flat-alternative-list {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      color: rgba(78, 84, 93, 1);
-      font-size: 13px;
-      line-height: 20px;
-      text-align: left;
-      cursor: pointer;
-
-      &:hover {
-        background: rgba(31, 35, 41, 0.06);
-      }
-
-      &.active {
-        border-color: var(--ed-color-primary, rgba(28, 186, 144, 1));
-        background: var(--ed-color-primary-1a, rgba(28, 186, 144, 0.1));
-      }
-
-      &.disabled {
-        cursor: not-allowed;
-        opacity: 0.6;
-      }
+      flex-direction: column;
+      gap: 12px;
     }
 
     .alternative-type {
-      min-width: 44px;
+      flex: none;
+      min-width: 48px;
       padding: 1px 6px;
       border-radius: 4px;
       color: var(--ed-color-primary, rgba(28, 186, 144, 1));
@@ -1364,13 +1463,85 @@ watch(
       text-align: center;
     }
 
-    .alternative-title {
-      color: rgba(31, 35, 41, 1);
-      font-weight: 500;
+    .flat-alternative-card {
+      width: 100%;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid rgba(222, 224, 227, 1);
+      border-radius: 8px;
+      background: #fff;
     }
 
-    .alternative-reason {
+    .flat-alternative-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .flat-alternative-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(31, 35, 41, 1);
+      font-weight: 500;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .flat-alternative-reason {
+      margin-top: 6px;
       color: rgba(100, 106, 115, 1);
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .flat-alternative-summary {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(31, 35, 41, 0.03);
+      color: rgba(78, 84, 93, 1);
+      font-size: 13px;
+      line-height: 20px;
+
+      :deep(p) {
+        margin: 0 0 6px 0;
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+
+      :deep(ul),
+      :deep(ol) {
+        margin: 4px 0;
+        padding-left: 18px;
+      }
+
+      :deep(strong) {
+        color: var(--ed-color-primary, rgba(28, 186, 144, 1));
+        font-weight: 600;
+      }
+    }
+
+    .flat-alternative-chart {
+      height: 320px;
+      width: 100%;
+      min-width: 0;
+      margin-top: 10px;
+    }
+
+    .analysis-list {
+      margin: 10px 0 0 0;
+      padding-left: 18px;
+      color: rgba(78, 84, 93, 1);
+      font-size: 13px;
+      line-height: 20px;
+
+      &.compact {
+        margin-top: 8px;
+      }
     }
   }
 }

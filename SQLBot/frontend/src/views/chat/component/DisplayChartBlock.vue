@@ -46,6 +46,14 @@ const normalizedChartObject = computed<ChartConfig>(() =>
 
 const canRender = computed(() => canRenderChartConfig(normalizedChartObject.value))
 
+// 区分两种"渲染不出图"的情形：真的没数据 vs 有数据但当前图表配置无法渲染。
+// 后者此前也显示"暂无数据"，具有误导性；这里改成明确提示并引导切换为表格。
+const emptyDescription = computed(() => {
+  if (props.loadingData) return t('chat.loading_data')
+  if (!props.data || props.data.length === 0) return t('chat.no_data')
+  return t('chat.chart_render_blocked') || '当前图表配置无法渲染，可切换为表格查看'
+})
+
 const xAxis = computed(() => {
   const x = normalizedChartObject.value?.axis?.x
   return isAxisItem(x) ? [x] : []
@@ -112,7 +120,7 @@ defineExpose({
       :multi-quota-name="multiQuotaName"
       :show-label="showLabel"
     />
-    <el-empty v-else :description="loadingData ? t('chat.loading_data') : t('chat.no_data')" />
+    <el-empty v-else :description="emptyDescription" />
   </div>
 </template>
 

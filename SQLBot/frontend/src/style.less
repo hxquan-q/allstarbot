@@ -238,11 +238,199 @@ strong {
   }
 }
 
+// Markdown answer rendering — shared by analysis / predict / thinking / chart summary.
+// Tightened, consistent vertical rhythm tuned for a chat answer card (the article-scale
+// margins shipped with github-markdown-css feel loose and inconsistent here).
 .markdown-body {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #1f2329;
+  word-break: break-word;
+
+  // Keep the card tight: no stray top/bottom gaps around the whole block.
+  > *:first-child {
+    margin-top: 0 !important;
+  }
+  > *:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 18px 0 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #1f2329;
+  }
+  h1 {
+    font-size: 1.3em;
+  }
+  h2 {
+    font-size: 1.15em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(31, 35, 41, 0.12);
+  }
+  h3 {
+    font-size: 1.02em;
+    margin: 14px 0 8px;
+  }
+  h4,
+  h5,
+  h6 {
+    font-size: 0.96em;
+    margin: 12px 0 6px;
+  }
+
+  p {
+    margin: 0 0 12px;
+  }
+
+  a {
+    color: var(--ed-color-primary, #1cba90);
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  strong {
+    font-weight: 600;
+  }
+
+  ul,
+  ol {
+    margin: 0 0 12px;
+    padding-left: 22px;
+  }
+  li {
+    margin: 4px 0;
+    & > ul,
+    & > ol {
+      margin: 4px 0 0;
+    }
+  }
+
+  // Inline code
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.88em;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    background: rgba(31, 35, 41, 0.06);
+    color: #1f2329;
+  }
+
+  // Fenced code blocks
+  pre {
+    margin: 0 0 12px;
+    padding: 0;
+    background: #f6f8fa;
+    border: 1px solid rgba(31, 35, 41, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    code {
+      display: block;
+      padding: 12px 14px;
+      background: transparent;
+      color: inherit;
+      font-size: 0.86em;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+    }
+  }
+
+  blockquote {
+    margin: 0 0 12px;
+    padding: 4px 14px;
+    border-left: 3px solid var(--ed-color-primary, #1cba90);
+    background: rgba(28, 186, 144, 0.06);
+    color: #646a73;
+
+    & > :last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  // Tables are wrapped in .md-table-wrap by the renderer so wide ones scroll
+  // instead of overflowing the (max 800px) answer column.
+  .md-table-wrap {
+    margin: 0 0 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    width: 100%;
+    max-width: 100%;
+    display: table;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th,
+    td {
+      padding: 8px 12px;
+      border: 1px solid rgba(31, 35, 41, 0.12);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      font-weight: 600;
+      white-space: nowrap;
+      background: rgba(31, 35, 41, 0.04);
+    }
+    tr:nth-child(even) td {
+      background: rgba(31, 35, 41, 0.02);
+    }
+  }
+
   hr {
+    margin: 16px 0;
     border: none !important;
-    background: #1f232926 !important;
+    background: rgba(31, 35, 41, 0.15) !important;
     height: 1px !important;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+// Copy button + language chrome injected around fenced code blocks (see MdComponent).
+.md-code-block {
+  position: relative;
+
+  .md-copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 8px;
+    font-size: 12px;
+    line-height: 18px;
+    color: #646a73;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(31, 35, 41, 0.12);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    z-index: 1;
+
+    &:hover {
+      color: #1f2329;
+      border-color: rgba(31, 35, 41, 0.2);
+    }
+    &.copied {
+      color: var(--ed-color-primary, #1cba90);
+      border-color: var(--ed-color-primary, #1cba90);
+    }
+  }
+
+  &:hover .md-copy-btn,
+  &:focus-within .md-copy-btn {
+    opacity: 1;
   }
 }
 

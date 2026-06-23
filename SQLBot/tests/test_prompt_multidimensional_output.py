@@ -14,20 +14,21 @@ def test_chart_prompt_requires_insights_and_alternatives():
     assert '"insights"' in content
 
 
-def test_chart_prompt_requires_layered_narrative_summary():
-    """summary 必须是分层式业务分析报告，而非数据复述"""
+def test_chart_prompt_requires_dashboard_narrative_summary():
+    """summary 必须是看板式高密度简报，而非列表墙式数据复述"""
     with open(TEMPLATE_PATH, encoding="utf-8") as f:
         content = f.read()
 
     assert "narrative-summary" in content
-    # 金字塔六节结构的关键要求
-    assert "pyramid-structure" in content
-    assert "overall-conclusion" in content
-    assert "layered-findings" in content
-    assert "top-issues" in content          # TOP 问题定位到具体对象
-    assert "metric-definition" in content   # 指标口径澄清
-    assert "layered-actions" in content     # 分级行动建议
-    assert "chart-guidance" in content      # 图表绑定业务疑问
+    assert "dashboard-architecture" in content
+    assert "EXECUTIVE DASHBOARD" in content
+    assert "STRATEGIC INSIGHTS" in content
+    assert "EXCEPTION RADAR" in content
+    assert "ACTION ROADMAP" in content
+    assert "轻量级 Markdown 表格" in content
+    assert "chart-text-anchoring" in content
+    assert "👉" in content
+    assert "24小时内" in content
 
 
 def test_sql_prompt_requires_comparison_layering():

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import 'highlight.js/styles/github.min.css'
-import 'github-markdown-css/github-markdown-light.css'
 import hljs from 'highlight.js'
 
 defineProps<{

@@ -37,6 +37,7 @@ from apps.chat.curd.chat import save_question, save_sql_answer, save_sql, \
     get_last_execute_sql_error, format_json_data, format_chart_fields, get_chat_brief_generate, get_chat_predict_data, \
     get_chat_chart_config, trigger_log_error
 from apps.chat.data_profile import build_data_profile, build_data_profile_text, enrich_chart_config
+from apps.chat.task.json_repair import repair_json_string_literals
 from apps.chat.models.chat_model import ChatQuestion, ChatRecord, Chat, RenameChat, ChatLog, OperationEnum, \
     ChatFinishStep, AxisObj, SystemPromptMessage, HumanPromptMessage, AIPromptMessage
 from apps.data_training.curd.data_training import get_training_template
@@ -45,7 +46,7 @@ from apps.datasource.crud.permission import get_row_permission_filters, is_norma
 from apps.datasource.embedding.ds_embedding import get_ds_embedding
 from apps.datasource.models.datasource import CoreDatasource
 from apps.db.db import exec_sql, get_version, check_connection, get_sqlglot_dialect
-from apps.db.sql_checker import check_sql_with_langchain, repair_sql_with_langchain
+from apps.db.sql_checker import check_sql_with_langchain, ensure_read_only_sql, repair_sql_with_langchain
 from apps.db.sql_identifier import quote_known_table_identifiers
 from apps.system.crud.aimodel_manage import get_ai_model_list_by_workspace
 from apps.system.crud.assistant import AssistantOutDs, AssistantOutDsFactory, get_assistant_ds
@@ -1094,6 +1095,11 @@ class LLMService:
         return sql
 
     def validate_sql_tables(self, sql: str):
+        try:
+            ensure_read_only_sql(sql, self.ds.type)
+        except ValueError as e:
+            raise SingleMessageError(f"SQL can only contain read operations: {str(e)}")
+
         # 表名安全检查：用 sqlglot 解析真实 SQL，不信任 AI 返回的 tables
         actual_tables = extract_tables_from_sql(sql, ds_type=self.ds.type)
         if not actual_tables:
@@ -1244,7 +1250,7 @@ class LLMService:
         try:
             data = orjson.loads(json_str)
         except Exception:
-            repaired = self.repair_json_string_literals(json_str)
+            repaired = repair_json_string_literals(json_str)
             try:
                 data = orjson.loads(repaired)
             except Exception:
@@ -1269,15 +1275,6 @@ class LLMService:
         if end <= start:
             return None
         return stripped[start:end + 1]
-
-    @staticmethod
-    def repair_json_string_literals(text: str) -> str:
-        """Repair common model mistakes inside JSON strings without changing valid JSON."""
-        repaired = text.strip()
-        # Remove JavaScript-style comments that sometimes appear in examples.
-        repaired = re.sub(r'(?m)^\s*//.*$', '', repaired)
-        repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
-        return repaired
 
     def build_fallback_chart(self, profile: Optional[Dict[str, Any]], reason: Optional[str] = None) -> Dict[str, Any]:
         fields = []

@@ -3,6 +3,7 @@ import BaseAnswer from './BaseAnswer.vue'
 import { chatApi, ChatInfo, type ChatMessage, ChatRecord } from '@/api/chat.ts'
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import MdComponent from '@/views/chat/component/MdComponent.vue'
+import { extractSSEFrames } from '@/utils/sse'
 const props = withDefaults(
   defineProps<{
     chatList?: Array<ChatInfo>
@@ -120,10 +121,11 @@ const sendMessage = async () => {
 
       let chunk = decoder.decode(value, { stream: true })
       tempResult += chunk
-      const split = tempResult.match(/data:.*}\n\n/g)
+      const parsed = extractSSEFrames(tempResult)
+      tempResult = parsed.remainder
+      const split = parsed.frames.length ? parsed.frames.map((f) => 'data:' + f + '\n\n') : null
       if (split) {
         chunk = split.join('')
-        tempResult = tempResult.replace(chunk, '')
       } else {
         continue
       }

@@ -380,6 +380,64 @@ def _build_key_metrics(profile: dict[str, Any]) -> list[dict[str, Any]]:
     return key_metrics
 
 
+def _enrich_top_values_with_metrics(profile: dict[str, Any], rows: list[dict]) -> None:
+    """为分类维度的 top_values 关联每个对象的指标合计值。
+
+    报告"重点问题定位"需要点名具体对象并给出其指标数字（如每个客户的偏差率）。
+    top_values 原本只有 {value, count}（仅对象名），模型拿不到数值便会打印推理困惑
+    （"需在主表中查看…"）。这里补上 metric_values，让模型有真实数字可引用、无需编造。
+    仅处理 category_dimension，focus 指标取前 3 个以控制 token 与速度。
+    """
+    metrics = [m for m in (profile.get("metrics") or []) if isinstance(m, str)]
+    if not metrics or not rows:
+        return
+
+    def _is_derived_metric(name: str) -> bool:
+        lowered = name.lower()
+        return any(kw in name or kw in lowered for kw in
+                   ("rate", "ratio", "deviation", "偏差", "率", "比", "达成", "占比", "同比", "环比"))
+
+    # 优先纳入派生/关键指标（偏差率、达成率、占比、同环比…）——报告点名最常引用的就是这类；
+    # 再按原顺序补齐其余指标，总数封顶以控制 data-profile 的 token 开销。
+    focus_metrics = sorted(metrics, key=lambda m: (0 if _is_derived_metric(m) else 1, metrics.index(m)))[:4]
+
+    for field_info in profile.get("fields", []):
+        if not isinstance(field_info, dict) or field_info.get("role") != "category_dimension":
+            continue
+        tops = field_info.get("top_values")
+        if not isinstance(tops, list) or not tops:
+            continue
+        fname = field_info.get("name")
+
+        # 单次扫描数据，按对象名聚合每个 focus 指标（Decimal 精确累加）
+        grouped: dict[Any, dict[str, list[Decimal]]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            value = row.get(fname)
+            if value is None or value == "":
+                continue
+            bucket = grouped.setdefault(value, {m: [] for m in focus_metrics})
+            for metric in focus_metrics:
+                parsed = _parse_decimal(row.get(metric))
+                if parsed is not None:
+                    bucket[metric].append(parsed)
+
+        for top in tops:
+            if not isinstance(top, dict):
+                continue
+            bucket = grouped.get(top.get("value"))
+            if not bucket:
+                continue
+            metric_values: dict[str, Any] = {}
+            for metric in focus_metrics:
+                values = bucket.get(metric) or []
+                if values:
+                    metric_values[metric] = _plain_number(sum(values, Decimal(0)))
+            if metric_values:
+                top["metric_values"] = metric_values
+
+
 def build_data_profile(fields: list[str] | None, data: list[dict] | None, max_rows: int = MAX_PROFILE_ROWS) -> dict[str, Any]:
     rows = [row for row in (data or []) if isinstance(row, dict)]
     sampled_rows = rows[:max_rows]
@@ -402,6 +460,7 @@ def build_data_profile(fields: list[str] | None, data: list[dict] | None, max_ro
     profile["chart_alternatives"] = _build_chart_alternatives(profile)
     profile["insights"] = _build_insights(profile)
     profile["key_metrics"] = _build_key_metrics(profile)
+    _enrich_top_values_with_metrics(profile, sampled_rows)
     return profile
 
 
