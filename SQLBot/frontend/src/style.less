@@ -646,3 +646,23 @@ strong {
     padding: 0 4px !important;
   }
 }
+
+/* === report-quality: table headers must not truncate; TOP1 callout highlight === */
+.md-render-container .md-table-wrap th {
+  white-space: normal;
+  word-break: break-word;
+  min-width: 96px;
+}
+
+/* The analysis prompt emits a blockquote starting with "🔴 TOP1" for the top problem.
+   The container carries both `markdown-body` and `md-render-container` on one element
+   (see MdComponent.vue), so the selector targets a blockquote inside that combined element.
+   Amber/warning tones read as "notable callout" — the 🔴 emoji already conveys severity,
+   so red would make ordinary quotes look like errors. */
+.md-render-container blockquote {
+  border-left: 4px solid #e6a23c;   /* el-color-warning: attention, not error */
+  background: #fdf6ec;              /* el-color-warning-light-9 */
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
