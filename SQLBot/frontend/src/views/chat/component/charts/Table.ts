@@ -11,7 +11,7 @@ import {
 } from '@antv/s2'
 import { debounce, filter } from 'lodash-es'
 import { i18n } from '@/i18n'
-import { formatNumber } from '@/views/chat/component/charts/utils.ts'
+import { formatNumber } from '@/views/chat/component/echarts/data.ts'
 import '@antv/s2/dist/s2.min.css'
 
 const { t } = i18n.global

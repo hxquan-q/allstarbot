@@ -119,6 +119,8 @@ defineExpose({
       :data="data"
       :multi-quota-name="multiQuotaName"
       :show-label="showLabel"
+      :record-id="message.record.id"
+      :echarts="normalizedChartObject.echarts"
     />
     <el-empty v-else :description="emptyDescription" />
   </div>
