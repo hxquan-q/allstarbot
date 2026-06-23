@@ -12,7 +12,6 @@ from sqlmodel import SQLModel, Field
 
 from apps.db.constant import DB
 from apps.template.filter.generator import get_permissions_template
-from apps.template.generate_analysis.generator import get_analysis_template
 from apps.template.generate_chart.generator import get_chart_template
 from apps.template.generate_dynamic.generator import get_dynamic_template
 from apps.template.generate_guess_question.generator import get_guess_question_template
@@ -299,13 +298,26 @@ class AiModelQuestion(BaseModel):
                                                    chart_type=chart_type, schema=schema,
                                                    data_profile=self.data_profile)
 
+    def _analysis_input(self):
+        # lazy import: apps.chat.prompts sits under apps.chat; avoid any import-cycle risk.
+        from apps.chat.prompts import AnalysisPromptInput
+        return AnalysisPromptInput(
+            lang=self.lang or "简体中文",
+            sqlbot_name=self.sqlbot_name or "小爱同学",
+            terminologies=self.terminologies or "",
+            custom_prompt=self.custom_prompt or "",
+            fields=self.fields or "[]",
+            data=self.data or "[]",
+            data_profile=self.data_profile or "{}",
+        )
+
     def analysis_sys_question(self):
-        return get_analysis_template()['system'].format(lang=self.lang, terminologies=self.terminologies,
-                                                        custom_prompt=self.custom_prompt, sqlbot_name=self.sqlbot_name)
+        from apps.chat.prompts import build_analysis_messages
+        return build_analysis_messages(self._analysis_input())[0]["content"]
 
     def analysis_user_question(self):
-        return get_analysis_template()['user'].format(fields=self.fields, data=self.data,
-                                                      data_profile=self.data_profile)
+        from apps.chat.prompts import build_analysis_messages
+        return build_analysis_messages(self._analysis_input())[1]["content"]
 
     def predict_sys_question(self):
         return get_predict_template()['system'].format(lang=self.lang, custom_prompt=self.custom_prompt,

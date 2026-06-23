@@ -44,3 +44,22 @@ def test_user_prompt_injects_fields_data_profile():
     user = build_analysis_messages(inp)[1]["content"]
     assert "demand_total" in user
     assert "metrics" in user
+
+
+from apps.chat.models.chat_model import AiModelQuestion  # noqa: E402
+
+
+def test_analysis_sys_user_question_use_builder():
+    q = AiModelQuestion()
+    q.lang = "简体中文"
+    q.sqlbot_name = "小爱同学"
+    q.terminologies = "<terminologies></terminologies>"
+    q.custom_prompt = ""
+    q.fields = '["demand_total"]'
+    q.data = '[{"demand_total": 1}]'
+    q.data_profile = '{"metrics": ["demand_total"]}'
+    system = q.analysis_sys_question()
+    user = q.analysis_user_question()
+    assert "数据口径" in system      # new critical rule present
+    assert "demand_total" in user   # fields injected
+    assert "metrics" in user        # profile injected

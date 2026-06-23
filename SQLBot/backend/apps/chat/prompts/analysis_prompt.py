@@ -8,7 +8,7 @@ instead of inventing them.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 _SYSTEM_PREAMBLE = (
@@ -32,7 +32,7 @@ _RULES = [
                  "首部用一个以 `> 🔴 TOP1` 开头的引用块单独置顶最大问题，格式固定："
                  "`> 🔴 TOP1：{对象} {指标} {数字}{单位}（{阈值判断}）`。严禁只说\"有N个异常\"不点名。"),
     ("normal", "## 📈 趋势与变化：量化变化幅度(增长 X%)，指出拐点位置。"),
-    ("critical", "## 🎯 行动建议：按 🔴高/🟡中/🟢低 三层，每条必须三要素——对象 + 具体抓手(采购加急/库存调拨/替代料/安全库存调整参考值) + "
+    ("critical", "## 🛠️ 行动建议：按 🔴高/🟡中/🟢低 三层，每条必须三要素——对象 + 具体抓手(采购加急/库存调拨/替代料/安全库存调整参考值) + "
                  "解决什么 + 兜底影响(不处理会影响哪些产品线、预估停线天数或损失)。禁止泛泛\"建立跟踪清单\"。"),
     ("normal", "## 📊 图表建议：每种图表说明解决什么具体业务疑问(非泛泛\"看趋势\")。"),
     ("normal", "术语(supply_gap_total、gap_rate_percent、BOM关键性 等)首次出现必须括注通俗解释。"),
