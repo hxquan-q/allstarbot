@@ -78,3 +78,48 @@ def test_enrich_top_values_without_metrics_does_not_crash():
     cat_field = next(f for f in profile["fields"] if f["name"] == "category")
     for top in cat_field.get("top_values", []):
         assert "metric_values" not in top
+
+
+def test_unit_inferred_from_field_name():
+    profile = build_data_profile(
+        ["material_name", "amount", "gap_rate", "qty"],
+        [{"material_name": "A", "amount": 100, "gap_rate": 0.12, "qty": 5}],
+    )
+    by_name = {f["name"]: f for f in profile["fields"]}
+    assert by_name["amount"]["unit"] == "元"
+    assert by_name["qty"]["unit"] == "pcs"
+    assert by_name["gap_rate"]["unit"] == "%"
+    assert by_name["material_name"].get("unit") is None
+
+
+def test_unit_percent_by_value_range_when_name_has_rate():
+    profile = build_data_profile(
+        ["rate"],
+        [{"rate": 12.0}, {"rate": 7.0}, {"rate": 15.0}],
+    )
+    assert profile["fields"][0]["unit"] == "%"
+
+
+def test_unit_percent_by_value_range_without_keyword():
+    profile = build_data_profile(
+        ["completion"],
+        [{"completion": 0.12}, {"completion": 0.07}, {"completion": 0.15}],
+    )
+    assert profile["fields"][0]["unit"] == "%"
+
+
+def test_scale_hint_wan_for_large_currency_sum():
+    profile = build_data_profile(
+        ["amount"],
+        [{"amount": 8216389}, {"amount": 3361000}],
+    )
+    field = profile["fields"][0]
+    assert field["scale_hint"] is not None
+    assert "万" in field["scale_hint"]
+
+
+def test_unit_none_when_no_signal():
+    profile = build_data_profile(
+        ["mystery"], [{"mystery": 42}, {"mystery": 7}],
+    )
+    assert profile["fields"][0].get("unit") is None

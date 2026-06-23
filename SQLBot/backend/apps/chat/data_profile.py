@@ -21,6 +21,47 @@ METRIC_KEYWORDS = (
     "数量", "次数", "金额", "总", "合计", "平均", "均值", "收入", "利润", "成本",
     "价格", "单价", "占比", "比例", "率", "得分", "分数", "指标",
 )
+UNIT_CURRENCY_KEYWORDS = (
+    "price", "cost", "amount", "金额", "收入", "利润", "成本", "单价", "营业额", "总价", "总额",
+)
+UNIT_COUNT_KEYWORDS = (
+    "qty", "quantity", "数量", "件", "个", "台", "套", "pcs", "count", "次数",
+)
+UNIT_WEIGHT_KEYWORDS = ("weight", "kg", "克", "吨", "重量")
+UNIT_PERCENT_KEYWORDS = ("rate", "ratio", "percent", "率", "占比", "百分比")
+
+
+def _infer_unit(name: str, numeric_values: list[Decimal]) -> str | None:
+    """Infer a unit LABEL from the field name and value range. Never converts."""
+    if _keyword_match(name, UNIT_PERCENT_KEYWORDS):
+        return "%"
+    if numeric_values:
+        sample = numeric_values[:200]
+        nonneg = [v for v in sample if v >= 0]
+        if nonneg and all(v <= 1 for v in nonneg):
+            return "%"
+    if _keyword_match(name, UNIT_CURRENCY_KEYWORDS):
+        return "元"
+    if _keyword_match(name, UNIT_WEIGHT_KEYWORDS):
+        return "kg"
+    if _keyword_match(name, UNIT_COUNT_KEYWORDS):
+        return "pcs"
+    return None
+
+
+def _compute_scale_hint(total: Decimal | None, unit: str | None) -> str | None:
+    """Give a 万/亿 magnitude label for large sums so the model has the conversion."""
+    if total is None or total == 0:
+        return None
+    magnitude = abs(total)
+    if unit == "元":
+        if magnitude >= Decimal("100000000"):
+            return f"≈ {_plain_number(total / Decimal('100000000'))} 亿元"
+        if magnitude >= Decimal("10000"):
+            return f"≈ {_plain_number(total / Decimal('10000'))} 万元"
+    elif magnitude >= Decimal("10000"):
+        return f"≈ {_plain_number(total / Decimal('10000'))} 万{unit or ''}".strip()
+    return None
 
 
 def _field_names(fields: list[str] | None, data: list[dict] | None) -> list[str]:
@@ -173,6 +214,10 @@ def _field_profile(name: str, values: list[Any], row_count: int) -> dict[str, An
             "avg": _plain_number(total / len(numeric_values)),
             "sum": _plain_number(total),
         }
+        profile["unit"] = _infer_unit(name, numeric_values)
+        profile["scale_hint"] = _compute_scale_hint(
+            total, profile.get("unit")
+        )
 
     if datetime_values:
         profile["datetime"] = {
