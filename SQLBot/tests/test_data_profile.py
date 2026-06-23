@@ -205,3 +205,16 @@ def test_code_to_name_refuses_numeric_or_id_companion():
     code_field = next(f for f in profile["fields"] if f["name"] == "material_code")
     for top in code_field.get("top_values", []):
         assert top.get("label") in (None, top.get("value")) or top["label"] == top["value"]
+
+
+def test_enrich_chart_config_stamps_unit_on_y_axis():
+    profile = build_data_profile(
+        ["material", "amount"], [{"material": "A", "amount": 100}, {"material": "B", "amount": 200}],
+    )
+    chart = enrich_chart_config(
+        {"type": "bar", "title": "x", "axis": {"x": {"name": "material", "value": "material"},
+                                                "y": [{"name": "amount", "value": "amount"}]}},
+        profile,
+    )
+    y_items = chart["axis"]["y"]
+    assert y_items[0]["unit"] == "元"

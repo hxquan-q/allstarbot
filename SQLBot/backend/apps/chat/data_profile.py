@@ -679,4 +679,29 @@ def enrich_chart_config(chart: dict[str, Any], profile: dict[str, Any] | None) -
             existing_types.add(key)
 
     enriched["alternatives"] = alternatives[:3]
+
+    # Stamp each metric's inferred unit onto its axis entry so the frontend can
+    # label ticks (e.g. "万元", "pcs"). No value conversion — label only.
+    unit_by_metric = {
+        f.get("name"): f.get("unit")
+        for f in (profile.get("fields", []) if profile else [])
+        if isinstance(f, dict)
+    }
+
+    def _stamp_unit(axis_item):
+        if not isinstance(axis_item, dict):
+            return
+        y = axis_item.get("y")
+        items = y if isinstance(y, list) else [y] if isinstance(y, dict) else []
+        for it in items:
+            if isinstance(it, dict) and it.get("value") in unit_by_metric:
+                u = unit_by_metric.get(it.get("value"))
+                if u:
+                    it["unit"] = u
+
+    _stamp_unit(enriched.get("axis"))
+    for alt in enriched.get("alternatives") or []:
+        if isinstance(alt, dict):
+            _stamp_unit(alt.get("axis"))
+
     return enriched
