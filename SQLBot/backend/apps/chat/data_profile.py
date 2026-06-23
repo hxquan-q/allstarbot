@@ -505,6 +505,57 @@ def _build_key_metrics(profile: dict[str, Any]) -> list[dict[str, Any]]:
     return key_metrics
 
 
+NAME_COLUMN_KEYWORDS = ("name", "名称", "描述", "desc", "title", "品名")
+
+
+def _is_name_like_column(field_info: dict[str, Any]) -> bool:
+    if not isinstance(field_info, dict):
+        return False
+    role = field_info.get("role")
+    if role in {"metric", "time_dimension"}:
+        return False
+    if field_info.get("type") in {"number", "datetime"}:
+        return False
+    name = str(field_info.get("name", ""))
+    has_cjk = any("一" <= ch <= "鿿" for ch in name)
+    return bool(_keyword_match(name, NAME_COLUMN_KEYWORDS)) or has_cjk
+
+
+def _pair_code_to_name_label(rows: list[dict], fields: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    """For each category column, find a 1:1 / many:1 name-like companion and map code→display label."""
+    category_fields = [f for f in fields if isinstance(f, dict) and f.get("role") == "category_dimension"]
+    name_fields = [f for f in fields if _is_name_like_column(f)]
+    if not category_fields or not name_fields:
+        return {}
+
+    # Build code→name map where the relationship is consistent (many:1 allowed, 1:many rejected).
+    result: dict[str, dict[str, str]] = {}
+    for cat in category_fields:
+        cat_name = cat.get("name")
+        for nf in name_fields:
+            nf_name = nf.get("name")
+            if nf_name == cat_name:  # never pair a column with itself
+                continue
+            mapping: dict[str, str] = {}
+            consistent = True
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                code = row.get(cat_name)
+                disp = row.get(nf_name)
+                if _is_empty(code) or _is_empty(disp):
+                    continue
+                code_s, disp_s = str(code), str(disp)
+                if code_s in mapping and mapping[code_s] != disp_s:
+                    consistent = False  # 1:many → not an attribute
+                    break
+                mapping[code_s] = disp_s
+            if consistent and mapping:
+                result[cat_name] = mapping
+                break
+    return result
+
+
 def _enrich_top_values_with_metrics(profile: dict[str, Any], rows: list[dict]) -> None:
     """为分类维度的 top_values 关联每个对象的指标合计值。
 
@@ -525,6 +576,8 @@ def _enrich_top_values_with_metrics(profile: dict[str, Any], rows: list[dict]) -
     # 优先纳入派生/关键指标（偏差率、达成率、占比、同环比…）——报告点名最常引用的就是这类；
     # 再按原顺序补齐其余指标，总数封顶以控制 data-profile 的 token 开销。
     focus_metrics = sorted(metrics, key=lambda m: (0 if _is_derived_metric(m) else 1, metrics.index(m)))[:4]
+
+    code_to_name = _pair_code_to_name_label(rows, profile.get("fields", []))
 
     for field_info in profile.get("fields", []):
         if not isinstance(field_info, dict) or field_info.get("role") != "category_dimension":
@@ -561,6 +614,13 @@ def _enrich_top_values_with_metrics(profile: dict[str, Any], rows: list[dict]) -
                     metric_values[metric] = _plain_number(sum(values, Decimal(0)))
             if metric_values:
                 top["metric_values"] = metric_values
+
+            # code→name display label (e.g. "MECH.000085 硅胶密封圈(VMQ 70A)")
+            name_map = code_to_name.get(fname)
+            if name_map:
+                disp = name_map.get(str(top.get("value")))
+                if disp:
+                    top["label"] = f"{top.get('value')} {disp}"
 
 
 def build_data_profile(fields: list[str] | None, data: list[dict] | None, max_rows: int = MAX_PROFILE_ROWS) -> dict[str, Any]:

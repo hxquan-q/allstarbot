@@ -175,3 +175,33 @@ def test_distribution_all_equal_constant_column():
     dist = profile["fields"][0]["distribution"]
     assert sum(b["count"] for b in dist["bands"]) == 4
     assert dist["extreme_count"] == 0  # constant column → no extremes
+
+
+def test_code_to_name_paired_when_companion_name_column_exists():
+    profile = build_data_profile(
+        ["material_code", "material_name", "gap"],
+        [
+            {"material_code": "MECH.000085", "material_name": "硅胶密封圈(VMQ 70A)", "gap": 86795},
+            {"material_code": "MECH.000086", "material_name": "O型圈(NBR)", "gap": 5000},
+            {"material_code": "MECH.000085", "material_name": "硅胶密封圈(VMQ 70A)", "gap": 100},
+        ],
+    )
+    code_field = next(f for f in profile["fields"] if f["name"] == "material_code")
+    tops = code_field["top_values"]
+    top1 = tops[0]
+    assert "硅胶密封圈" in top1["label"]
+    assert "MECH.000085" in top1["label"]
+
+
+def test_code_to_name_refuses_numeric_or_id_companion():
+    # companion column is an id-like integer → must not be used as a display label
+    profile = build_data_profile(
+        ["material_code", "ref_id", "gap"],
+        [
+            {"material_code": "M1", "ref_id": 1001, "gap": 1},
+            {"material_code": "M2", "ref_id": 1002, "gap": 2},
+        ],
+    )
+    code_field = next(f for f in profile["fields"] if f["name"] == "material_code")
+    for top in code_field.get("top_values", []):
+        assert top.get("label") in (None, top.get("value")) or top["label"] == top["value"]
