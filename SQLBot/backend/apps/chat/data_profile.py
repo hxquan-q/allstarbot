@@ -94,6 +94,54 @@ def _compute_scale_hint(total: Decimal | None, unit: str | None) -> str | None:
     return None
 
 
+def _compute_distribution(name: str, numeric_values: list[Decimal]) -> dict[str, Any] | None:
+    """Data-driven quartile bands + extreme/near-ceiling counts. No hard-coded 8/15."""
+    if len(numeric_values) < 4:
+        return None
+    sorted_vals = sorted(numeric_values)
+    n = len(sorted_vals)
+    lo, hi = sorted_vals[0], sorted_vals[-1]
+
+    def at(frac: float) -> Decimal:
+        idx = min(n - 1, max(0, int(round(frac * (n - 1)))))
+        return sorted_vals[idx]
+
+    q1, q2, q3 = at(0.25), at(0.5), at(0.75)
+    cut_points = [q1, q2, q3, hi]
+
+    bands: list[dict[str, Any]] = []
+    prev = lo
+    labels = ["低", "中低", "中高", "高"]
+    # 注：样本量较小时相邻分位点可能重合，导致中间分桶为空（count=0），属正常现象，分桶计数合计仍等于样本量。
+    for i, cut in enumerate(cut_points):
+        count = sum(1 for v in sorted_vals if (prev < v <= cut) or (i == 0 and v == prev))
+        bands.append({
+            "label": labels[i],
+            "min": _plain_number(prev),
+            "max": _plain_number(cut),
+            "count": count,
+        })
+        prev = cut
+
+    span = hi - lo
+    if span == 0:
+        # Constant column: no variation → no meaningful extremes or near-ceiling rows.
+        result: dict[str, Any] = {"bands": bands, "extreme_count": 0}
+        if _infer_unit(name, numeric_values) == "%":
+            result["near_ceiling_count"] = 0
+        return result
+
+    extreme_threshold = hi - span * Decimal("0.2")
+    extreme_count = sum(1 for v in sorted_vals if v >= extreme_threshold)
+
+    result = {"bands": bands, "extreme_count": extreme_count}
+    # Rate metric (see _infer_unit 口径): also count rows near the observed ceiling.
+    if _infer_unit(name, numeric_values) == "%":
+        near = hi - span * Decimal("0.15")
+        result["near_ceiling_count"] = sum(1 for v in sorted_vals if v >= near)
+    return result
+
+
 def _field_names(fields: list[str] | None, data: list[dict] | None) -> list[str]:
     names: list[str] = []
     for field in fields or []:
@@ -249,6 +297,7 @@ def _field_profile(name: str, values: list[Any], row_count: int) -> dict[str, An
         profile["scale_hint"] = _compute_scale_hint(
             total, profile.get("unit")
         )
+        profile["distribution"] = _compute_distribution(name, numeric_values)
 
     if datetime_values:
         profile["datetime"] = {

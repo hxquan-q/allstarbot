@@ -144,3 +144,34 @@ def test_alias_keeps_unknown_tokens_and_skips_already_chinese():
     assert by_name["weird_xyz"]["alias"] == "weird xyz"
     # Already-Chinese names alias to themselves
     assert by_name["物料编码"]["alias"] == "物料编码"
+
+
+def test_distribution_quartile_bands_and_extreme_count():
+    profile = build_data_profile(
+        ["gap"],
+        [{"gap": v} for v in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 50, 60]],
+    )
+    dist = profile["fields"][0]["distribution"]
+    assert sum(b["count"] for b in dist["bands"]) == 12
+    assert dist["extreme_count"] >= 1  # 50, 60 are within 20% of max(60)
+    assert all("label" in b and "count" in b for b in dist["bands"])
+
+
+def test_distribution_none_for_too_few_values():
+    profile = build_data_profile(["gap"], [{"gap": 1}, {"gap": 2}])
+    assert profile["fields"][0].get("distribution") is None
+
+
+def test_distribution_near_ceiling_for_rate_metric():
+    profile = build_data_profile(
+        ["gap_rate"], [{"gap_rate": v} for v in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 14.9]],
+    )
+    dist = profile["fields"][0]["distribution"]
+    assert dist["near_ceiling_count"] >= 1
+
+
+def test_distribution_all_equal_constant_column():
+    profile = build_data_profile(["gap"], [{"gap": 7}, {"gap": 7}, {"gap": 7}, {"gap": 7}])
+    dist = profile["fields"][0]["distribution"]
+    assert sum(b["count"] for b in dist["bands"]) == 4
+    assert dist["extreme_count"] == 0  # constant column → no extremes
