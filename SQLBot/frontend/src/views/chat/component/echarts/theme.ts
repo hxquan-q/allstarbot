@@ -1,5 +1,4 @@
 import { formatNumber } from './data.ts'
-import { formatAxisWithUnit } from '../../../../utils/chartAxis.ts'
 
 /** 与原 G2 版本一致的 SQLBOT 配色。 */
 export const SQLBOT_PALETTE = [
@@ -16,17 +15,14 @@ export const SQLBOT_PALETTE = [
 ]
 
 /**
- * 统一数值 formatter：标注单位（label-not-convert，不换算数值，仅折叠 元→万/亿）。
- * - isPercent（数据含 "%"）优先 → 直接显示百分数，不走 formatAxisWithUnit 的 ×100（echarts 里值已是 85 而非 0.85）
- * - unit='元' → formatAxisWithUnit 折叠到 万/亿
- * - unit='%'（数据为 0-1 比例、未被 isPercent 捕获）→ formatAxisWithUnit ×100
- * - 其他 unit → 千分符 + 单位后缀
+ * 通用数值 formatter：不写死任何单位特例（label-not-convert，不换算、不折叠）。
+ * - isPercent（数据含 "%"）→ 追加 %（echarts 里百分比值已是 85 而非 0.85）
+ * - 任意 unit 字符串 → 原样作为后缀追加（"元/吨/件/pcs/美元…" 一视同仁）
+ * - 无单位 → 仅千分符
  */
 export function makeValueFormatter(isPercent = false, unit?: string) {
   return (value: any) => {
     if (isPercent) return `${formatNumber(value)}%`
-    if (unit === '元') return formatAxisWithUnit(value, '元')
-    if (unit === '%') return formatAxisWithUnit(value, '%')
     if (unit) return `${formatNumber(value)} ${unit}`
     return `${formatNumber(value)}`
   }
