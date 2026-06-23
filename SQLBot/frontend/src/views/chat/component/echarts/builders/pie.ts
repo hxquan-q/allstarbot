@@ -1,5 +1,5 @@
 import type { NormalizedChartData } from '../data.ts'
-import { formatNumber } from '../data.ts'
+import { makeValueFormatter } from '../theme.ts'
 
 export function buildPie(norm: NormalizedChartData, showLabel: boolean) {
   const nameField = norm.series[0]?.value ?? norm.x[0]?.value
@@ -8,10 +8,12 @@ export function buildPie(norm: NormalizedChartData, showLabel: boolean) {
     name: String(row?.[nameField] ?? ''),
     value: row?.[valueField] ?? null,
   }))
+  const fmt = makeValueFormatter(norm.isPercent, norm.y[0]?.unit)
   return {
     tooltip: {
       trigger: 'item',
-      valueFormatter: (value: any) => `${formatNumber(value)}${norm.isPercent ? '%' : ''}`,
+      formatter: (p: any) =>
+        `${p.name}<br/>${norm.y[0]?.name ?? ''}: ${fmt(p.value)} (${p.percent}%)`,
     },
     legend: { type: 'scroll', orient: 'vertical', left: 'left' },
     series: [

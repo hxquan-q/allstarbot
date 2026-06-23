@@ -1,9 +1,14 @@
-import { formatNumber, type NormalizedChartData } from '../data.ts'
-import { axisLabelFormatter } from '../theme.ts'
+import { type NormalizedChartData } from '../data.ts'
+import { makeValueFormatter } from '../theme.ts'
 
 function categoryValues(norm: NormalizedChartData): string[] {
   const field = norm.x[0]?.value
   return norm.rows.map((row) => String(row?.[field] ?? ''))
+}
+
+/** 单指标的 value 轴单位（多指标 multi-quota 展开后无统一单位）。 */
+function metricUnit(norm: NormalizedChartData): string | undefined {
+  return norm.y[0]?.unit
 }
 
 function buildSeries(
@@ -11,13 +16,11 @@ function buildSeries(
   type: 'bar' | 'line',
   showLabel: boolean,
   stacked: boolean,
-  area: boolean
+  area: boolean,
+  fmt: (value: any) => string
 ): Array<Record<string, any>> {
   const yField = norm.y[0]?.value
-  const labelFormatter = (value: any) => `${formatNumber(value)}${norm.isPercent ? '%' : ''}`
-  const baseLabel = showLabel
-    ? { show: true, formatter: (p: any) => labelFormatter(p.value) }
-    : undefined
+  const baseLabel = showLabel ? { show: true, formatter: (p: any) => fmt(p.value) } : undefined
 
   if (norm.series.length > 0) {
     const sField = norm.series[0].value
@@ -51,15 +54,17 @@ function buildSeries(
 }
 
 export function buildColumn(norm: NormalizedChartData, showLabel: boolean) {
+  const fmt = makeValueFormatter(norm.isPercent, metricUnit(norm))
   return {
     xAxis: { type: 'category', data: categoryValues(norm), axisLabel: { hideOverlap: true } },
-    yAxis: { type: 'value', axisLabel: { formatter: axisLabelFormatter(norm.isPercent) } },
-    series: buildSeries(norm, 'bar', showLabel, norm.series.length > 0, false),
+    yAxis: { type: 'value', axisLabel: { formatter: fmt } },
+    series: buildSeries(norm, 'bar', showLabel, norm.series.length > 0, false, fmt),
   }
 }
 
 export function buildBar(norm: NormalizedChartData, showLabel: boolean) {
-  const series = buildSeries(norm, 'bar', showLabel, norm.series.length > 0, false).map((s) => ({
+  const fmt = makeValueFormatter(norm.isPercent, metricUnit(norm))
+  const series = buildSeries(norm, 'bar', showLabel, norm.series.length > 0, false, fmt).map((s) => ({
     ...s,
     label: showLabel
       ? { show: true, position: 'right', formatter: s.label?.formatter }
@@ -67,12 +72,13 @@ export function buildBar(norm: NormalizedChartData, showLabel: boolean) {
   }))
   return {
     yAxis: { type: 'category', data: categoryValues(norm), axisLabel: { hideOverlap: true } },
-    xAxis: { type: 'value', axisLabel: { formatter: axisLabelFormatter(norm.isPercent) } },
+    xAxis: { type: 'value', axisLabel: { formatter: fmt } },
     series,
   }
 }
 
 function buildTrend(norm: NormalizedChartData, showLabel: boolean, area: boolean) {
+  const fmt = makeValueFormatter(norm.isPercent, metricUnit(norm))
   return {
     xAxis: {
       type: 'category',
@@ -80,8 +86,8 @@ function buildTrend(norm: NormalizedChartData, showLabel: boolean, area: boolean
       boundaryGap: false,
       axisLabel: { hideOverlap: true },
     },
-    yAxis: { type: 'value', axisLabel: { formatter: axisLabelFormatter(norm.isPercent) } },
-    series: buildSeries(norm, 'line', showLabel, false, area),
+    yAxis: { type: 'value', axisLabel: { formatter: fmt } },
+    series: buildSeries(norm, 'line', showLabel, false, area, fmt),
   }
 }
 

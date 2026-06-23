@@ -80,4 +80,37 @@ opt = buildEChartsOption({
 })
 assert.equal(opt.title.fn, undefined)
 
+// 单位标注（unit）接入 value 轴 / tooltip / 数据标签
+const yuanRows = [
+  { 城市: '北京', 金额: 8216389 },
+  { 城市: '上海', 金额: 50000 },
+]
+const yuanAxis = [
+  { name: '城市', value: '城市', type: 'x' },
+  { name: '金额', value: '金额', type: 'y', unit: '元' },
+]
+opt = buildEChartsOption({ type: 'column', axis: yuanAxis, data: yuanRows, showLabel: true })
+assert.equal(opt.yAxis.axisLabel.formatter(8216389), '821.64 万元') // 元 → 万折叠
+assert.equal(opt.tooltip.valueFormatter(50000), '5.00 万元') // tooltip 同样折叠
+assert.equal(opt.series[0].label.formatter({ value: 8216389 }), '821.64 万元') // 标注
+
+const tonAxis = [
+  { name: '城市', value: '城市', type: 'x' },
+  { name: '重量', value: '重量', type: 'y', unit: '吨' },
+]
+opt = buildEChartsOption({ type: 'column', axis: tonAxis, data: [{ 城市: '北京', 重量: 1500 }] })
+assert.equal(opt.yAxis.axisLabel.formatter(1500), '1,500 吨') // 千分符 + 单位
+
+// 百分比数据优先于 unit（不被 formatAxisWithUnit 的 ×100 误伤）
+const pctAxis = [
+  { name: '城市', value: '城市', type: 'x' },
+  { name: '达成率', value: '达成率', type: 'y', unit: '%' },
+]
+opt = buildEChartsOption({ type: 'column', axis: pctAxis, data: [{ 城市: '北京', 达成率: '85%' }] })
+assert.equal(opt.yAxis.axisLabel.formatter(85), '85%') // isPercent → 直接 85%，不 ×100
+
+// bar 横向：value 轴是 xAxis，同样带单位
+opt = buildEChartsOption({ type: 'bar', axis: yuanAxis, data: yuanRows })
+assert.equal(opt.xAxis.axisLabel.formatter(8216389), '821.64 万元')
+
 console.log('options.test.mjs OK')

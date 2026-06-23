@@ -4,6 +4,7 @@ export interface ChartAxis {
   type?: 'x' | 'y' | 'series' | 'other-info'
   'multi-quota'?: boolean
   hidden?: boolean
+  unit?: string
 }
 
 export interface ChartData {

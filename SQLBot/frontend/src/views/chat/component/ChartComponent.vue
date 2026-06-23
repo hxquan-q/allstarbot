@@ -53,6 +53,7 @@ const axis = computed(() => {
       value: column.value,
       type: 'y',
       'multi-quota': column['multi-quota'],
+      unit: column.unit,
     })
   })
   params.series.forEach((column) => {

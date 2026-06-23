@@ -1,7 +1,7 @@
 import { merge } from 'lodash-es'
 import type { ChartAxis, ChartData } from '../BaseChart.ts'
-import { formatNumber, normalizeChartData } from './data.ts'
-import { SQLBOT_PALETTE } from './theme.ts'
+import { normalizeChartData } from './data.ts'
+import { SQLBOT_PALETTE, makeValueFormatter } from './theme.ts'
 import { buildArea, buildBar, buildColumn, buildLine } from './builders/cartesian.ts'
 import { buildPie } from './builders/pie.ts'
 import { buildScatter } from './builders/scatter.ts'
@@ -26,6 +26,7 @@ function sanitizeEscape(echarts: Record<string, any> | undefined): Record<string
 export function buildEChartsOption(input: BuildInput): Record<string, any> {
   const { type, axis, data, showLabel = false, echarts } = input
   const norm = normalizeChartData(axis, data)
+  const valueFmt = makeValueFormatter(norm.isPercent, norm.y[0]?.unit)
 
   const common: Record<string, any> = {
     color: SQLBOT_PALETTE,
@@ -39,7 +40,7 @@ export function buildEChartsOption(input: BuildInput): Record<string, any> {
     tooltip: {
       trigger: type === 'pie' || type === 'scatter' ? 'item' : 'axis',
       axisPointer: { type: 'shadow' },
-      valueFormatter: (value: any) => `${formatNumber(value)}${norm.isPercent ? '%' : ''}`,
+      valueFormatter: valueFmt,
     },
     legend:
       norm.series.length > 0 && type !== 'pie' && type !== 'scatter'
