@@ -8,5 +8,15 @@ from apps.chat.prompts.sql_prompt import (
     SqlPromptInput,
     build_sql_messages,
 )
+from apps.chat.prompts.analysis_prompt import (
+    AnalysisPromptInput,
+    build_analysis_messages,
+)
 
-__all__ = ["SQL_PRODUCTION_RULES", "SqlPromptInput", "build_sql_messages"]
+__all__ = [
+    "SQL_PRODUCTION_RULES",
+    "SqlPromptInput",
+    "build_sql_messages",
+    "AnalysisPromptInput",
+    "build_analysis_messages",
+]
