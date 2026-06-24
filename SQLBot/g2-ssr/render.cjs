@@ -45,4 +45,4 @@ function render(obj) {
   }
 }
 
-module.exports = { render, WIDTH, HEIGHT }
+module.exports = { render, WIDTH, HEIGHT, createCanvas }

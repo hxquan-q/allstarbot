@@ -1,13 +1,7 @@
+// 出图样张生成：复用 g2-ssr/render.cjs（与生产同一条 echarts 链路），不再依赖 G2。
 const fs = require('fs')
 const path = require('path')
-const { createChart } = require('@antv/g2-ssr')
-const { createCanvas } = require('canvas')
-const { getColumnOptions } = require('./charts/column.js')
-const { getBarOptions } = require('./charts/bar.js')
-const { getLineOptions } = require('./charts/line.js')
-const { getPieOptions } = require('./charts/pie.js')
-const { getScatterOptions } = require('./charts/scatter.js')
-const { getAreaOptions } = require('./charts/area.js')
+const { render, createCanvas } = require('../g2-ssr/render.cjs')
 
 const outputDir = '/tmp/chart-render-check'
 
@@ -43,95 +37,16 @@ const scatterData = [
   { cost: '73', revenue: '118', segment: '重点客户' },
 ]
 
-const base = {
-  width: 760,
-  height: 460,
-  imageType: 'png',
-  theme: {
-    view: {
-      viewFill: '#FFFFFF',
-    },
-  },
-}
-
 const cases = [
-  {
-    type: 'column',
-    name: '柱状图',
-    options: getColumnOptions(
-      base,
-      [
-        { name: '地区', value: 'region', type: 'x' },
-        { name: '销售额', value: 'sales', type: 'y' },
-      ],
-      regionData,
-    ),
-  },
-  {
-    type: 'bar',
-    name: '条形图',
-    options: getBarOptions(
-      base,
-      [
-        { name: '地区', value: 'region', type: 'x' },
-        { name: '利润', value: 'profit', type: 'y' },
-      ],
-      regionData,
-    ),
-  },
-  {
-    type: 'line',
-    name: '折线图',
-    options: getLineOptions(
-      base,
-      [
-        { name: '月份', value: 'month', type: 'x' },
-        { name: '指标值', value: 'value', type: 'y' },
-        { name: '渠道', value: 'category', type: 'series' },
-      ],
-      trendData,
-    ),
-  },
-  {
-    type: 'pie',
-    name: '饼图',
-    options: getPieOptions(
-      base,
-      [
-        { name: '销售额', value: 'sales', type: 'y' },
-        { name: '地区', value: 'region', type: 'series' },
-      ],
-      regionData,
-    ),
-  },
-  {
-    type: 'scatter',
-    name: '散点图',
-    options: getScatterOptions(
-      base,
-      [
-        { name: '成本', value: 'cost', type: 'x' },
-        { name: '收入', value: 'revenue', type: 'y' },
-        { name: '客户分层', value: 'segment', type: 'series' },
-      ],
-      scatterData,
-    ),
-  },
-  {
-    type: 'area',
-    name: '面积图',
-    options: getAreaOptions(
-      base,
-      [
-        { name: '月份', value: 'month', type: 'x' },
-        { name: '指标值', value: 'value', type: 'y' },
-        { name: '渠道', value: 'category', type: 'series' },
-      ],
-      trendData,
-    ),
-  },
+  { type: 'column', name: '柱状图', axis: [{ name: '地区', value: 'region', type: 'x' }, { name: '销售额', value: 'sales', type: 'y' }], data: regionData },
+  { type: 'bar', name: '条形图', axis: [{ name: '地区', value: 'region', type: 'x' }, { name: '利润', value: 'profit', type: 'y' }], data: regionData },
+  { type: 'line', name: '折线图', axis: [{ name: '月份', value: 'month', type: 'x' }, { name: '指标值', value: 'value', type: 'y' }, { name: '渠道', value: 'category', type: 'series' }], data: trendData },
+  { type: 'pie', name: '饼图', axis: [{ name: '销售额', value: 'sales', type: 'y' }, { name: '地区', value: 'region', type: 'series' }], data: regionData },
+  { type: 'scatter', name: '散点图', axis: [{ name: '成本', value: 'cost', type: 'x' }, { name: '收入', value: 'revenue', type: 'y' }, { name: '客户分层', value: 'segment', type: 'series' }], data: scatterData },
+  { type: 'area', name: '面积图', axis: [{ name: '月份', value: 'month', type: 'x' }, { name: '指标值', value: 'value', type: 'y' }, { name: '渠道', value: 'category', type: 'series' }], data: trendData },
 ]
 
+// ponytail: 明细表前端走 @antv/s2，这里用原生 canvas 画一张展示样张（与 echarts 无关，独立保留）
 function renderTableSample() {
   const file = path.join(outputDir, 'table.png')
   const canvas = createCanvas(760, 460)
@@ -190,7 +105,7 @@ function renderTableSample() {
   return file
 }
 
-async function render() {
+function renderAll() {
   fs.mkdirSync(outputDir, { recursive: true })
   const tableFile = renderTableSample()
   const results = [
@@ -198,22 +113,24 @@ async function render() {
       type: 'table',
       name: '明细表',
       status: 'pass',
-      note: `前端 Table 使用 @antv/s2，源码链路和构建已通过；生成展示 PNG ${fs.statSync(tableFile).size} bytes`,
+      note: `前端 Table 使用 @antv/s2；样张 PNG ${fs.statSync(tableFile).size} bytes`,
       file: 'table.png',
     },
   ]
 
   for (const item of cases) {
-    const chart = await createChart(item.options)
-    const file = path.join(outputDir, item.type)
-    await chart.exportToFile(file)
-    const png = `${file}.png`
-    const size = fs.statSync(png).size
+    const file = render({
+      type: item.type,
+      axis: JSON.stringify(item.axis),
+      data: JSON.stringify(item.data),
+      path: path.join(outputDir, item.type),
+    })
+    const size = fs.statSync(file).size
     results.push({
       type: item.type,
       name: item.name,
       status: size > 1000 ? 'pass' : 'fail',
-      note: size > 1000 ? `生成 PNG ${size} bytes` : `PNG 文件过小 ${size} bytes`,
+      note: size > 1000 ? `生成 PNG ${size} bytes` : `PNG 过小 ${size} bytes`,
       file: `${item.type}.png`,
     })
   }
@@ -222,7 +139,9 @@ async function render() {
   console.log(JSON.stringify(results, null, 2))
 }
 
-render().catch((error) => {
+try {
+  renderAll()
+} catch (error) {
   console.error(error)
   process.exit(1)
-})
+}
