@@ -1,5 +1,4 @@
 # Build sqlbot
-FROM ghcr.io/1panel-dev/maxkb-vector-model:v1.0.1 AS vector-model
 FROM --platform=${BUILDPLATFORM} registry.cn-qingdao.aliyuncs.com/dataease/sqlbot-base:latest AS sqlbot-ui-builder
 ENV SQLBOT_HOME=/opt/sqlbot
 ENV APP_HOME=${SQLBOT_HOME}/app
@@ -9,7 +8,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN mkdir -p ${APP_HOME} ${UI_HOME}
 
 COPY frontend /tmp/frontend
-RUN cd /tmp/frontend && npm install && npm run build && mv dist ${UI_HOME}/dist
+# 与 frontend/package.json 的 build:chart-lib 同源（options.ts → chart-option.cjs）；
+# 参数（--format/--platform/--target/--external）改一处看两处，避免漂移。
+RUN cd /tmp/frontend && npm install && npm run build && mv dist ${UI_HOME}/dist \
+    && npx esbuild src/views/chat/component/echarts/options.ts --bundle --format=cjs --platform=node --target=node18 --external:echarts --outfile=/tmp/chart-option.cjs
 
 
 FROM registry.cn-qingdao.aliyuncs.com/dataease/sqlbot-base:latest AS sqlbot-builder
@@ -41,7 +43,7 @@ COPY ./backend ${APP_HOME}
 
 # Final sync to ensure all dependencies are installed
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --extra cpu
+    ulimit -n 65536 && uv sync --extra cpu
 
 # Build g2-ssr
 FROM registry.cn-qingdao.aliyuncs.com/dataease/sqlbot-base:latest AS ssr-builder
@@ -60,9 +62,9 @@ RUN npm config set fund false \
     && npm config set audit false \
     && npm config set progress false
 
-COPY g2-ssr/app.js g2-ssr/package.json /app/
-COPY g2-ssr/charts/* /app/charts/
+COPY g2-ssr /app/
 RUN npm install
+COPY --from=sqlbot-ui-builder /tmp/chart-option.cjs /app/lib/chart-option.cjs
 
 # Runtime stage
 FROM registry.cn-qingdao.aliyuncs.com/dataease/sqlbot-python-pg:latest
@@ -85,11 +87,10 @@ COPY start.sh /opt/sqlbot/app/start.sh
 COPY g2-ssr/*.ttf /usr/share/fonts/truetype/liberation/
 COPY --from=sqlbot-builder ${SQLBOT_HOME} ${SQLBOT_HOME}
 COPY --from=ssr-builder /app /opt/sqlbot/g2-ssr
-COPY --from=vector-model /opt/maxkb/app/model /opt/sqlbot/models
 
 WORKDIR ${SQLBOT_HOME}/app
 
-RUN mkdir -p /opt/sqlbot/images /opt/sqlbot/g2-ssr
+RUN mkdir -p /opt/sqlbot/images /opt/sqlbot/g2-ssr /opt/sqlbot/models
 
 EXPOSE 3000 8000 8001 5432
 
