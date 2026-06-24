@@ -19,9 +19,8 @@ frontend/dist
 
 # g2-ssr: deps are regenerated inside the image (npm install in Dockerfile).
 # Copying local node_modules bloats the context (~129M) and can clash with the
-# container's native modules (@napi-rs/canvas). Exclude it + the local smoke-test file.
+# container's native modules (@napi-rs/canvas). Exclude it.
 g2-ssr/node_modules
-g2-ssr/selfcheck.cjs
 
 # Runtime data is mounted as volumes, not baked into the image.
 data
