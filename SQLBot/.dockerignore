@@ -10,3 +10,22 @@ backend/.gitignore
 backend/README.md
 backend/scripts
 backend/.DS_Store
+
+# Frontend: deps & build output are regenerated inside the image (npm install && npm run build).
+# Copying local node_modules bloats the context (~512M) and can clash with the
+# container's node/platform native modules (esbuild/rollup). Exclude it.
+frontend/node_modules
+frontend/dist
+
+# g2-ssr: deps are regenerated inside the image (npm install in Dockerfile).
+# Copying local node_modules bloats the context (~129M) and can clash with the
+# container's native modules (@napi-rs/canvas). Exclude it + the local smoke-test file.
+g2-ssr/node_modules
+g2-ssr/selfcheck.cjs
+
+# Runtime data is mounted as volumes, not baked into the image.
+data
+data-8888
+
+# Docs/plans not needed in the runtime image.
+docs
