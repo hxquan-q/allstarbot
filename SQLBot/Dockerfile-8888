@@ -7,7 +7,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN mkdir -p ${UI_HOME}
 
 COPY frontend /tmp/frontend
-RUN cd /tmp/frontend && npm install && npm run build && mv dist ${UI_HOME}/dist
+RUN cd /tmp/frontend && npm install && npm run build && mv dist ${UI_HOME}/dist \
+    && npx esbuild src/views/chat/component/echarts/options.ts --bundle --format=cjs --platform=node --target=node18 --external:echarts --outfile=/tmp/chart-option.cjs \
+    && mkdir -p /tmp/canvas-deps && cd /tmp/canvas-deps && npm init -y >/dev/null && npm install @napi-rs/canvas
 
 
 FROM registry.cn-qingdao.aliyuncs.com/dataease/sqlbot:v1.6.0
@@ -23,8 +25,12 @@ WORKDIR ${APP_HOME}
 COPY start.sh ${APP_HOME}/start.sh
 COPY backend ${APP_HOME}
 COPY --from=sqlbot-ui-builder ${UI_HOME}/dist ${UI_HOME}/dist
-COPY g2-ssr/app.js ${SQLBOT_HOME}/g2-ssr/app.js
-COPY g2-ssr/charts ${SQLBOT_HOME}/g2-ssr/charts
+COPY g2-ssr ${SQLBOT_HOME}/g2-ssr
+COPY --from=sqlbot-ui-builder /tmp/chart-option.cjs ${SQLBOT_HOME}/g2-ssr/lib/chart-option.cjs
+# 基镜像 sqlbot:v1.6.0 无 npm：echarts + @napi-rs/canvas 从前端构建阶段整目录拷。@napi-rs/canvas（Skia 预编译、0 系统依赖）替代基镜像旧 node-canvas，根除 Docker 出图静默失败。
+COPY --from=sqlbot-ui-builder /tmp/frontend/node_modules/echarts ${SQLBOT_HOME}/g2-ssr/node_modules/echarts
+COPY --from=sqlbot-ui-builder /tmp/canvas-deps/node_modules/@napi-rs ${SQLBOT_HOME}/g2-ssr/node_modules/@napi-rs
+RUN rm -rf ${SQLBOT_HOME}/g2-ssr/charts ${SQLBOT_HOME}/g2-ssr/node_modules/@antv ${SQLBOT_HOME}/g2-ssr/node_modules/canvas
 
 RUN uv pip install --python ${APP_HOME}/.venv/bin/python \
     "pyhive[hive_pure_sasl]>=0.7.0" \
